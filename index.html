@@ -32,6 +32,7 @@
   <button data-view="standing">Stilling</button>
   <button data-view="player">Spilleropslag</button>
   <button data-view="schedule">Kampplan</button>
+  <button data-view="playerteams">Holdoversigt</button>
   <button data-view="players">Spillere</button>
   <button data-view="format">Format</button>
   <button data-view="live">Live setup</button>
@@ -53,6 +54,11 @@
 <section id="standing" class="view"><div class="card"><div class="row space"><h2>Stilling</h2><button class="btn" onclick="window.print()">Print</button></div><p class="muted">Sortering: point, målscore, sejre, scorede mål, færrest indkasserede mål.</p><div id="standingTable"></div></div></section>
 <section id="player" class="view"><div class="card"><h2>Spilleropslag</h2><div class="row"><input id="playerSearch" placeholder="Skriv spillernummer eller navn" oninput="renderPlayer()"><button class="btn" onclick="document.getElementById('playerSearch').value='';renderPlayer()">Ryd</button></div><div id="playerCard" style="margin-top:12px"></div></div></section>
 <section id="schedule" class="view"><div class="card"><div class="row space"><h2>Kampplan</h2><select id="scheduleRound"></select></div><div id="scheduleTable"></div></div></section>
+<section id="playerteams" class="view"><div class="card">
+  <div class="row space"><h2>Holdoversigt</h2><button class="btn" onclick="window.print()">Print</button></div>
+  <p class="muted">Navne står i venstre side. Kampene står som kolonner. Tallene viser hvilket hold spilleren er på i hver kamp.</p>
+  <div id="playerTeamTable" style="margin-top:12px"></div>
+</div></section>
 <section id="players" class="view"><div class="card">
   <div class="row space"><h2>Spillere</h2><button class="btn" onclick="savePlayersFromTable()">Gem navne/niveau</button></div>
   <p class="muted">Du kan rette navne og niveau her. Det gemmes i browseren.</p>
@@ -129,6 +135,32 @@ function renderResults(){let rf=document.getElementById('roundFilter'); if(!rf.d
  document.getElementById('resultsTable').innerHTML=html+'</tbody></table>';}
 function renderDashboard(){let done=0,goals=0,next=null; getActiveMatches().forEach(m=>{let r=getRes(m); if(r.a!==''&&r.b!==''){done++;goals+=+r.a+ +r.b}else if(!next)next=m}); let st=computeStanding(); document.getElementById('kpiDone').textContent=done+'/'+getActiveMatches().length; document.getElementById('kpiGoals').textContent=goals; document.getElementById('kpiLeader').textContent=st[0]?`${st[0].nr} · ${st[0].p} p`: '-'; document.getElementById('kpiNext').textContent=next?`K${next.round} B${next.lane}`:'Færdig';}
 function renderSchedule(){let sr=document.getElementById('scheduleRound'); if(!sr.dataset.ready){sr.innerHTML=Array.from({length:Math.max(...getActiveMatches().map(m=>m.round))},(_,i)=>`<option value="${i+1}">Kamp ${i+1}</option>`).join(''); sr.onchange=renderSchedule; sr.dataset.ready=1} let round=+sr.value||1; let html=''; getActiveMatches().filter(m=>m.round===round).forEach(m=>{html+=`<div class="card"><h3>Bane ${m.lane}: Hold ${m.team1} mod Hold ${m.team2}</h3><div class="teamline"><div class="teamno">Hold ${m.team1}</div><div>${m.players1.map(n=>`${n} ${player(n).name}`).join('<br>')}</div></div><div class="teamline"><div class="teamno">Hold ${m.team2}</div><div>${m.players2.map(n=>`${n} ${player(n).name}`).join('<br>')}</div></div></div>`}); document.getElementById('scheduleTable').innerHTML=html;}
+function renderPlayerTeams(){
+  const box=document.getElementById('playerTeamTable');
+  if(!box)return;
+  const matches=getActiveMatches();
+  const maxRound=Math.max(...matches.map(m=>m.round));
+  const playerMap={};
+  state.players.forEach(p=>{
+    playerMap[p.nr]={nr:p.nr,name:p.name,teams:{}};
+  });
+  matches.forEach(m=>{
+    m.players1.forEach(n=>{ if(playerMap[n]) playerMap[n].teams[m.round]=m.team1; });
+    m.players2.forEach(n=>{ if(playerMap[n]) playerMap[n].teams[m.round]=m.team2; });
+  });
+  const rows=Object.values(playerMap).sort((a,b)=>a.nr-b.nr);
+  let html='<table><thead><tr><th>Navn</th>';
+  for(let r=1;r<=maxRound;r++) html+=`<th>Kamp ${r}</th>`;
+  html+='</tr></thead><tbody>';
+  rows.forEach(p=>{
+    html+=`<tr><td><b>${p.name}</b></td>`;
+    for(let r=1;r<=maxRound;r++) html+=`<td style="text-align:right;font-weight:800">${p.teams[r]||''}</td>`;
+    html+='</tr>';
+  });
+  html+='</tbody></table>';
+  box.innerHTML=html;
+}
+
 function renderPlayer(){let q=(document.getElementById('playerSearch').value||'').toLowerCase().trim(); if(!q){document.getElementById('playerCard').innerHTML='<p class="muted">Skriv et spillernummer eller navn.</p>'; return} let p=state.players.find(x=>String(x.nr)===q)||state.players.find(x=>x.name.toLowerCase().includes(q)); if(!p){document.getElementById('playerCard').innerHTML='<p class="warn">Ingen spiller fundet.</p>'; return} let st=computeStanding(); let rank=st.findIndex(x=>x.nr===p.nr)+1; let stat=st.find(x=>x.nr===p.nr); let html=`<h3>${p.nr} · ${p.name} <span class="pill">${p.level||'niveau mangler'}</span></h3><p><b>Placering:</b> ${rank} · <b>Point:</b> ${stat.p} · <b>Målscore:</b> ${stat.ms}</p><table><thead><tr><th>Kamp</th><th>Hold</th><th>Bane</th><th>Modstanderhold</th><th>Holdkammerater</th></tr></thead><tbody>`;
  getActiveMatches().forEach(m=>{let on1=m.players1.includes(p.nr), on2=m.players2.includes(p.nr); if(!on1&&!on2)return; let mates=(on1?m.players1:m.players2).filter(n=>n!==p.nr).map(n=>`${n} ${player(n).name}`).join('<br>'); html+=`<tr><td>${m.round}</td><td>${on1?m.team1:m.team2}</td><td>${m.lane}</td><td>${on1?m.team2:m.team1}</td><td>${mates}</td></tr>`}); document.getElementById('playerCard').innerHTML=html+'</tbody></table>';}
 function renderPlayers(){let html='<table><thead><tr><th>Nr.</th><th>Navn</th><th>Niveau</th></tr></thead><tbody>'; state.players.forEach(p=>html+=`<tr><td>${p.nr}</td><td><input data-n="${p.nr}" data-f="name" value="${p.name}"></td><td><input data-n="${p.nr}" data-f="level" value="${p.level||''}"></td></tr>`); document.getElementById('playersTable').innerHTML=html+'</tbody></table>'}
@@ -144,7 +176,7 @@ function generate8x5Matches(){
   const playerCount=40, teamSize=5, teams=8, rounds=7;
   const base=[1,12,23,34,5,16,27,38,9,20,31,2,13,24,35,6,17,28,39,10,21,32,3,14,25,36,7,18,29,40,11,22,33,4,15,26,37,8,19,30];
   let matches=[], id=1;
-  const pairsByRound=[[[0,1],[2,3],[4,5],[6,7]],[[0,1],[2,3],[4,5],[6,7]],[[0,1],[2,3],[4,5],[6,7]],[[0,1],[2,3],[4,5],[6,7]],[[0,1],[2,3],[4,5],[6,7]],[[0,1],[2,3],[4,5],[6,7]],[[0,1],[2,3],[4,5],[6,7]]];
+  const pairsByRound=[[[0,7],[1,6],[2,5],[3,4]],[[0,6],[7,5],[1,4],[2,3]],[[0,5],[6,4],[7,3],[1,2]],[[0,4],[5,3],[6,2],[7,1]],[[0,3],[4,2],[5,1],[6,7]],[[0,2],[3,1],[4,7],[5,6]],[[0,1],[2,7],[3,6],[4,5]]];
   for(let r=1;r<=rounds;r++){
     let shift=((r-1)*3)%playerCount;
     let rotated=base.slice(shift).concat(base.slice(0,shift));
@@ -195,7 +227,7 @@ function deURIComponentSafe(s){return decodeURIComponent(escape(s));}
 function createPlayerShareLink(){const payload={players:state.players,format:state.format||'standard'}; const url=location.origin+location.pathname+'#players='+encodeSharePayload(payload); const box=document.getElementById('playerShareLink'); if(box){box.value=url; box.select();} navigator.clipboard?.writeText(url); const status=document.getElementById('excelImportStatus'); if(status) status.innerHTML='<span class="ok">Delbart link er lavet og forsøgt kopieret.</span>';}
 function loadSharedPlayersFromUrl(){if(!location.hash.startsWith('#players='))return; try{const payload=decodeSharePayload(location.hash.substring('#players='.length)); if(payload.players&&Array.isArray(payload.players)){state.players=payload.players; if(payload.format) state.format=payload.format; if(payload.format==='8x5') state.matches=generate8x5Matches(); persistState(); history.replaceState(null,'',location.pathname+location.search);}}catch(e){console.warn('Kunne ikke læse delt spillerliste',e);}}
 function updateHeader(){let sub=document.querySelector('header .sub'); if(sub) sub.textContent=currentFormat()==='8x5'?'40 spillere · 8 hold · 5 spillere pr. hold · samlet version':'96 spillere · 12 hold · 8 spillere pr. hold · samlet version';}
-function renderAll(updateResults=true){syncFormatUI(); updateHeader(); renderDashboard(); renderStanding(); if(updateResults) renderResults(); renderSchedule(); renderPlayer(); renderPlayers()}
+function renderAll(updateResults=true){syncFormatUI(); updateHeader(); renderDashboard(); renderStanding(); if(updateResults) renderResults(); renderSchedule(); renderPlayerTeams(); renderPlayer(); renderPlayers()}
 renderAll();
 </script>
 </body>
