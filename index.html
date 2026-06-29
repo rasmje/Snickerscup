@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Snickers Cup App</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root{--bg:#f6f7fb;--card:#fff;--text:#172033;--muted:#667085;--line:#e6e8ef;--accent:#12264a;--accent2:#f4b400;--ok:#0a7f42;--bad:#b42318}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:5;background:var(--accent);color:white;padding:14px 16px;box-shadow:0 2px 10px #0002}
+    header h1{margin:0;font-size:20px}.sub{font-size:12px;color:#d9e2ff;margin-top:2px}
+    nav{display:flex;gap:8px;overflow:auto;padding:10px 12px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:62px;z-index:4}
+    nav button,.btn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 13px;font-weight:650;cursor:pointer;color:var(--text)}
+    nav button.active,.btn.primary{background:var(--accent);color:white;border-color:var(--accent)}
+    main{padding:14px;max-width:1200px;margin:0 auto}.view{display:none}.view.active{display:block}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 1px 4px #00000008}
+    .kpi{font-size:28px;font-weight:800}.label{color:var(--muted);font-size:13px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.space{justify-content:space-between}
+    table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden}th,td{border-bottom:1px solid var(--line);padding:8px;text-align:left;font-size:14px}th{background:#f0f2f7;font-weight:800;position:static;top:auto}tr.top1 td{background:#fff7d6}tr.top2 td{background:#f2f4f7}tr.top3 td{background:#fff1dd}
+    input,select{border:1px solid var(--line);border-radius:10px;padding:9px;min-height:38px;background:white}input.score{width:68px;text-align:center;font-size:16px;font-weight:800}.muted{color:var(--muted)}.pill{border-radius:999px;background:#eef2ff;padding:4px 8px;font-size:12px;display:inline-block}.warn{color:var(--bad);font-weight:700}.ok{color:var(--ok);font-weight:700}.tabs{display:flex;gap:8px;overflow:auto;margin:8px 0 12px}.small{font-size:12px}.hidden{display:none!important}
+    .teamline{display:grid;grid-template-columns:80px 1fr;gap:8px;margin:4px 0}.teamno{font-weight:800}.printonly{display:none}
+    #standingTable,#top10,#resultsTable,#playersTable,#scheduleTable,#playerCard{overflow-x:auto;-webkit-overflow-scrolling:touch} thead{position:static}
+    @media(max-width:800px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))} th,td{font-size:13px;padding:7px} nav{top:58px} input.score{width:58px}}
+    @media print{header,nav,.no-print,.btn{display:none!important}.view{display:block}.view:not(.active){display:none}.card{box-shadow:none}body{background:white}.printonly{display:block}}
+  </style>
+</head>
+<body>
+<header><h1>Snickers Cup</h1><div class="sub">96 spillere · 12 hold · 12 kampe · live stilling</div></header>
+<nav class="no-print">
+  <button data-view="dashboard" class="active">Dashboard</button>
+  <button data-view="results">Resultater</button>
+  <button data-view="standing">Stilling</button>
+  <button data-view="player">Spilleropslag</button>
+  <button data-view="schedule">Kampplan</button>
+  <button data-view="players">Spillere</button>
+  <button data-view="backup">Backup</button>
+</nav>
+<main>
+<section id="dashboard" class="view active">
+  <div class="grid">
+    <div class="card"><div class="label">Færdige banekampe</div><div id="kpiDone" class="kpi">0/72</div></div>
+    <div class="card"><div class="label">Aktuel fører</div><div id="kpiLeader" class="kpi">-</div></div>
+    <div class="card"><div class="label">Næste manglende</div><div id="kpiNext" class="kpi">-</div></div>
+    <div class="card"><div class="label">Samlede mål</div><div id="kpiGoals" class="kpi">0</div></div>
+  </div>
+  <div class="card" style="margin-top:12px"><div class="row space"><h2>Top 10</h2><button class="btn" onclick="showView('standing')">Se hele stillingen</button></div><div id="top10"></div></div>
+</section>
+<section id="results" class="view">
+  <div class="card"><div class="row space"><h2>Resultater</h2><div class="row"><select id="roundFilter"></select><button class="btn" onclick="clearResults()">Nulstil resultater</button></div></div><p class="muted">Indtast mål for hvert hold. Bane 1 er altid hold 1 mod 2, bane 2 er hold 3 mod 4 osv.</p><div id="resultsTable"></div></div>
+</section>
+<section id="standing" class="view"><div class="card"><div class="row space"><h2>Stilling</h2><button class="btn" onclick="window.print()">Print</button></div><p class="muted">Sortering: point, målscore, sejre, scorede mål, færrest indkasserede mål.</p><div id="standingTable"></div></div></section>
+<section id="player" class="view"><div class="card"><h2>Spilleropslag</h2><div class="row"><input id="playerSearch" placeholder="Skriv spillernummer eller navn" oninput="renderPlayer()"><button class="btn" onclick="document.getElementById('playerSearch').value='';renderPlayer()">Ryd</button></div><div id="playerCard" style="margin-top:12px"></div></div></section>
+<section id="schedule" class="view"><div class="card"><div class="row space"><h2>Kampplan</h2><select id="scheduleRound"></select></div><div id="scheduleTable"></div></div></section>
+<section id="players" class="view"><div class="card"><div class="row space"><h2>Spillere</h2><button class="btn" onclick="savePlayersFromTable()">Gem navne/niveau</button></div><p class="muted">Du kan rette navne og niveau her. Det gemmes i browseren.</p><div id="playersTable"></div></div></section>
+<section id="backup" class="view"><div class="card"><h2>Backup / flyt til anden computer</h2><p>Eksportér resultater og navne som JSON, eller importér en tidligere backup.</p><div class="row"><button class="btn primary" onclick="exportBackup()">Download backup</button><input type="file" id="importFile" accept="application/json" onchange="importBackup(event)"></div><p class="small muted">Alt gemmes lokalt i den browser du bruger. Lægger du appen online, kan den stadig bruges som en simpel web-app.</p></div></section>
+</main>
+<script src="data.js"></script>
+<script>
+const DATA=window.SNICKERS_DATA; const LS='snickers-cup-v1';
+let state=JSON.parse(localStorage.getItem(LS)||'null')||{players:DATA.players, results:{}};
+function save(){localStorage.setItem(LS,JSON.stringify(state)); loadSharedPlayersFromUrl();
+renderAll();}
+function showView(id){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===id));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id)); if(id==='player') setTimeout(()=>document.getElementById('playerSearch').focus(),50)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+function resKey(m){return 'm'+m.id} function getRes(m){return state.results[resKey(m)]||{a:'',b:''}}
+function setRes(id,side,val){let k='m'+id; state.results[k]=state.results[k]||{a:'',b:''}; state.results[k][side]=val===''?'':Math.max(0,parseInt(val)||0); localStorage.setItem(LS,JSON.stringify(state)); renderAll(false)}
+function player(nr){return state.players.find(p=>p.nr===nr)||{nr,name:'Spiller '+nr,level:''}}
+function computeStanding(){let s={}; state.players.forEach(p=>s[p.nr]={nr:p.nr,name:p.name,level:p.level,k:0,v:0,u:0,t:0,mf:0,mi:0,ms:0,p:0});
+ DATA.matches.forEach(m=>{let r=getRes(m); if(r.a===''||r.b==='') return; let a=+r.a,b=+r.b; let p1=(a>b?3:a===b?1:0)+a, p2=(b>a?3:a===b?1:0)+b; let v1=a>b,u=a===b,v2=b>a;
+  m.players1.forEach(n=>{let x=s[n]; x.k++; x.v+=v1?1:0; x.u+=u?1:0; x.t+=v2?1:0; x.mf+=a; x.mi+=b; x.p+=p1;});
+  m.players2.forEach(n=>{let x=s[n]; x.k++; x.v+=v2?1:0; x.u+=u?1:0; x.t+=v1?1:0; x.mf+=b; x.mi+=a; x.p+=p2;}); });
+ Object.values(s).forEach(x=>x.ms=x.mf-x.mi);
+ return Object.values(s).sort((a,b)=>b.p-a.p||b.ms-a.ms||b.v-a.v||b.mf-a.mf||a.mi-b.mi||a.nr-b.nr);}
+function renderStanding(){let rows=computeStanding(); let html='<table><thead><tr><th>#</th><th>Nr.</th><th>Navn</th><th>Niv.</th><th>K</th><th>V</th><th>U</th><th>T</th><th>MF</th><th>MI</th><th>+/-</th><th>P</th></tr></thead><tbody>';
+ rows.forEach((x,i)=>html+=`<tr class="${i==0?'top1':i==1?'top2':i==2?'top3':''}"><td>${i+1}</td><td>${x.nr}</td><td>${x.name}</td><td>${x.level||''}</td><td>${x.k}</td><td>${x.v}</td><td>${x.u}</td><td>${x.t}</td><td>${x.mf}</td><td>${x.mi}</td><td>${x.ms}</td><td><b>${x.p}</b></td></tr>`);
+ document.getElementById('standingTable').innerHTML=html+'</tbody></table>'; document.getElementById('top10').innerHTML=html.replace('<tbody>','<tbody>').split('</tr>').slice(0,11).join('</tr>')+'</tr></tbody></table>';}
+function renderResults(){let rf=document.getElementById('roundFilter'); if(!rf.dataset.ready){rf.innerHTML='<option value="all">Alle kampe</option>'+[...Array(12)].map((_,i)=>`<option value="${i+1}">Kamp ${i+1}</option>`).join(''); rf.onchange=renderResults; rf.dataset.ready=1}
+ let f=rf.value||'all'; let ms=DATA.matches.filter(m=>f==='all'||m.round==f); let html='<table><thead><tr><th>Kamp</th><th>Bane</th><th>Hold</th><th>Mål</th><th></th><th>Mål</th><th>Hold</th></tr></thead><tbody>';
+ ms.forEach(m=>{let r=getRes(m); html+=`<tr><td>${m.round}</td><td>${m.lane}</td><td><b>${m.team1}</b></td><td><input class="score" type="number" min="0" value="${r.a}" oninput="setRes(${m.id},'a',this.value)"></td><td>-</td><td><input class="score" type="number" min="0" value="${r.b}" oninput="setRes(${m.id},'b',this.value)"></td><td><b>${m.team2}</b></td></tr>`});
+ document.getElementById('resultsTable').innerHTML=html+'</tbody></table>';}
+function renderDashboard(){let done=0,goals=0,next=null; DATA.matches.forEach(m=>{let r=getRes(m); if(r.a!==''&&r.b!==''){done++;goals+=+r.a+ +r.b}else if(!next)next=m}); let st=computeStanding(); document.getElementById('kpiDone').textContent=done+'/72'; document.getElementById('kpiGoals').textContent=goals; document.getElementById('kpiLeader').textContent=st[0]?`${st[0].nr} · ${st[0].p} p`: '-'; document.getElementById('kpiNext').textContent=next?`K${next.round} B${next.lane}`:'Færdig';}
+function renderSchedule(){let sr=document.getElementById('scheduleRound'); if(!sr.dataset.ready){sr.innerHTML=[...Array(12)].map((_,i)=>`<option value="${i+1}">Kamp ${i+1}</option>`).join(''); sr.onchange=renderSchedule; sr.dataset.ready=1} let round=+sr.value||1; let html=''; DATA.matches.filter(m=>m.round===round).forEach(m=>{html+=`<div class="card"><h3>Bane ${m.lane}: Hold ${m.team1} mod Hold ${m.team2}</h3><div class="teamline"><div class="teamno">Hold ${m.team1}</div><div>${m.players1.map(n=>`${n} ${player(n).name}`).join('<br>')}</div></div><div class="teamline"><div class="teamno">Hold ${m.team2}</div><div>${m.players2.map(n=>`${n} ${player(n).name}`).join('<br>')}</div></div></div>`}); document.getElementById('scheduleTable').innerHTML=html;}
+function renderPlayer(){let q=(document.getElementById('playerSearch').value||'').toLowerCase().trim(); if(!q){document.getElementById('playerCard').innerHTML='<p class="muted">Skriv et spillernummer eller navn.</p>'; return} let p=state.players.find(x=>String(x.nr)===q)||state.players.find(x=>x.name.toLowerCase().includes(q)); if(!p){document.getElementById('playerCard').innerHTML='<p class="warn">Ingen spiller fundet.</p>'; return} let st=computeStanding(); let rank=st.findIndex(x=>x.nr===p.nr)+1; let stat=st.find(x=>x.nr===p.nr); let html=`<h3>${p.nr} · ${p.name} <span class="pill">${p.level||'niveau mangler'}</span></h3><p><b>Placering:</b> ${rank} · <b>Point:</b> ${stat.p} · <b>Målscore:</b> ${stat.ms}</p><table><thead><tr><th>Kamp</th><th>Hold</th><th>Bane</th><th>Modstanderhold</th><th>Holdkammerater</th></tr></thead><tbody>`;
+ DATA.matches.forEach(m=>{let on1=m.players1.includes(p.nr), on2=m.players2.includes(p.nr); if(!on1&&!on2)return; let mates=(on1?m.players1:m.players2).filter(n=>n!==p.nr).map(n=>`${n} ${player(n).name}`).join('<br>'); html+=`<tr><td>${m.round}</td><td>${on1?m.team1:m.team2}</td><td>${m.lane}</td><td>${on1?m.team2:m.team1}</td><td>${mates}</td></tr>`}); document.getElementById('playerCard').innerHTML=html+'</tbody></table>';}
+function renderPlayers(){let html='<table><thead><tr><th>Nr.</th><th>Navn</th><th>Niveau</th></tr></thead><tbody>'; state.players.forEach(p=>html+=`<tr><td>${p.nr}</td><td><input data-n="${p.nr}" data-f="name" value="${p.name}"></td><td><input data-n="${p.nr}" data-f="level" value="${p.level||''}"></td></tr>`); document.getElementById('playersTable').innerHTML=html+'</tbody></table>'}
+function savePlayersFromTable(){document.querySelectorAll('#playersTable input').forEach(inp=>{let p=state.players.find(x=>x.nr==inp.dataset.n); p[inp.dataset.f]=inp.value}); save(); alert('Gemt')}
+function clearResults(){if(confirm('Vil du slette alle indtastede resultater?')){state.results={}; save()}}
+function exportBackup(){let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})); a.download='snickers-cup-backup.json'; a.click()}
+function importBackup(e){let file=e.target.files[0]; if(!file)return; let fr=new FileReader(); fr.onload=()=>{state=JSON.parse(fr.result); save(); alert('Backup importeret')}; fr.readAsText(file)}
+
+function encodeSharePayload(obj){
+  const json=JSON.stringify(obj);
+  return btoa(unescape(encodeURIComponent(json))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
+}
+function decodeSharePayload(str){
+  str=str.replaceAll('-','+').replaceAll('_','/');
+  while(str.length%4) str+='=';
+  return JSON.parse(decodeURIComponent(escape(atob(str))));
+}
+function createPlayerShareLink(){
+  const payload={players:state.players,format:state.format||'standard'};
+  const code=encodeSharePayload(payload);
+  const url=location.origin+location.pathname+'#players='+code;
+  const box=document.getElementById('playerShareLink');
+  if(box){box.value=url; box.select();}
+  navigator.clipboard?.writeText(url);
+  const status=document.getElementById('excelImportStatus');
+  if(status) status.innerHTML='<span class="ok">Delbart link er lavet og forsøgt kopieret. Når andre åbner linket, indlæses spillerlisten automatisk.</span>';
+}
+function loadSharedPlayersFromUrl(){
+  if(!location.hash.startsWith('#players=')) return;
+  try{
+    const payload=decodeSharePayload(location.hash.substring('#players='.length));
+    if(payload.players && Array.isArray(payload.players)){
+      state.players=payload.players;
+      if(payload.format) state.format=payload.format;
+      if(payload.format==='8x5' && typeof generate8x5Matches==='function') state.matches=generate8x5Matches();
+      localStorage.setItem(LS,JSON.stringify(state));
+      history.replaceState(null,'',location.pathname+location.search);
+    }
+  }catch(e){console.warn('Kunne ikke læse delt spillerliste',e);}
+}
+
+function renderAll(updateResults=true){renderDashboard(); renderStanding(); if(updateResults) renderResults(); renderSchedule(); renderPlayer(); renderPlayers()}
+renderAll();
+</script>
+</body>
+</html>
