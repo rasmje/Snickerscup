@@ -12,10 +12,10 @@ Bemærk:
 - Den kan lægges online senere, så spillere kan scanne QR-kode og følge med.
 
 
-Ny funktion: Upload spillerliste via Excel
-- Gå til fanen Spillere.
-- Klik på "Upload spillerliste fra Excel".
-- Brug en Excel-fil med kolonner som Nr, Navn og Niveau.
-- Alternativt kan filen have Fornavn og Efternavn i stedet for Navn.
-- Spillernumre bør matche kampplanen i data.js, fordi kampene refererer til spillernumre.
-- Upload gemmes lokalt i browseren ligesom resultaterne.
+OPTIMERET 8x5 KAMPPLAN
+- 8x5-formatet bruger nu en optimeret fast kampplan i stedet for simpel blok-rotation.
+- Rotationsanalyse for optimeret 8x5:
+  - Maks samme holdkammerat: 2 gange.
+  - Maks samme modstander: 3 gange.
+  - Holdkammerat-fordeling: [(1, 540), (2, 10)].
+  - Modstander-fordeling: [(1, 325), (2, 129), (3, 39)].

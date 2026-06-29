@@ -51,22 +51,9 @@
 <section id="standing" class="view"><div class="card"><div class="row space"><h2>Stilling</h2><button class="btn" onclick="window.print()">Print</button></div><p class="muted">Sortering: point, målscore, sejre, scorede mål, færrest indkasserede mål.</p><div id="standingTable"></div></div></section>
 <section id="player" class="view"><div class="card"><h2>Spilleropslag</h2><div class="row"><input id="playerSearch" placeholder="Skriv spillernummer eller navn" oninput="renderPlayer()"><button class="btn" onclick="document.getElementById('playerSearch').value='';renderPlayer()">Ryd</button></div><div id="playerCard" style="margin-top:12px"></div></div></section>
 <section id="schedule" class="view"><div class="card"><div class="row space"><h2>Kampplan</h2><select id="scheduleRound"></select></div><div id="scheduleTable"></div></div></section>
-<section id="players" class="view"><div class="card"><div class="row space"><h2>Spillere</h2><button class="btn" onclick="savePlayersFromTable()">Gem navne/niveau</button></div>
-  <p class="muted">Du kan rette navne og niveau her. Det gemmes i browseren.</p>
-  <div class="card" style="background:#f8fafc;margin:10px 0;border-style:dashed">
-    <h3 style="margin-top:0">Upload spillerliste fra Excel</h3>
-    <p class="muted small">Understøtter .xlsx, .xls og .csv. Appen leder efter kolonner som <b>Nr</b>/<b>Spillernr</b>, <b>Navn</b> eller <b>Fornavn</b> + <b>Efternavn</b>, samt valgfrit <b>Niveau</b>.</p>
-    <div class="row">
-      <input type="file" id="excelPlayerFile" accept=".xlsx,.xls,.csv" onchange="importPlayersFromExcel(event)">
-      <button class="btn" onclick="downloadPlayerTemplate()">Download Excel-skabelon</button>
-      <button class="btn" onclick="resetPlayersToDefault()">Nulstil spillere</button>
-    </div>
-    <div id="excelImportStatus" class="small muted" style="margin-top:8px"></div>
-  </div>
-  <div id="playersTable"></div></div></section>
+<section id="players" class="view"><div class="card"><div class="row space"><h2>Spillere</h2><button class="btn" onclick="savePlayersFromTable()">Gem navne/niveau</button></div><p class="muted">Du kan rette navne og niveau her. Det gemmes i browseren.</p><div id="playersTable"></div></div></section>
 <section id="backup" class="view"><div class="card"><h2>Backup / flyt til anden computer</h2><p>Eksportér resultater og navne som JSON, eller importér en tidligere backup.</p><div class="row"><button class="btn primary" onclick="exportBackup()">Download backup</button><input type="file" id="importFile" accept="application/json" onchange="importBackup(event)"></div><p class="small muted">Alt gemmes lokalt i den browser du bruger. Lægger du appen online, kan den stadig bruges som en simpel web-app.</p></div></section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="data.js"></script>
 <script>
 const DATA=window.SNICKERS_DATA; const LS='snickers-cup-v1';
@@ -99,81 +86,6 @@ function savePlayersFromTable(){document.querySelectorAll('#playersTable input')
 function clearResults(){if(confirm('Vil du slette alle indtastede resultater?')){state.results={}; save()}}
 function exportBackup(){let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'})); a.download='snickers-cup-backup.json'; a.click()}
 function importBackup(e){let file=e.target.files[0]; if(!file)return; let fr=new FileReader(); fr.onload=()=>{state=JSON.parse(fr.result); save(); alert('Backup importeret')}; fr.readAsText(file)}
-
-function normKey(k){return String(k||'').toLowerCase().trim().replaceAll(' ','').replaceAll('_','').replaceAll('.','')}
-function pick(row, keys){
-  let map={}; Object.keys(row).forEach(k=>map[normKey(k)]=row[k]);
-  for(const k of keys){let v=map[normKey(k)]; if(v!==undefined && v!==null && String(v).trim()!=='') return String(v).trim();}
-  return '';
-}
-function rowsToPlayers(rows){
-  let players=[];
-  rows.forEach((row,idx)=>{
-    let nrRaw = pick(row,['nr','nummer','spillernr','spiller nr','spiller nummer','id']);
-    let nr = parseInt(String(nrRaw).replace(/[^0-9]/g,''),10);
-    if(!nr) nr = idx+1;
-    let fullName = pick(row,['navn','spiller','spiller navn','fulde navn','fuldt navn','name']);
-    let first = pick(row,['fornavn','first name','firstname']);
-    let last = pick(row,['efternavn','last name','lastname']);
-    let name = fullName || [first,last].filter(Boolean).join(' ');
-    if(!name) name = 'Spiller '+nr;
-    let level = pick(row,['niveau','level','gruppe','årgang','hold']);
-    players.push({nr:nr, name:name, level:level});
-  });
-  // Fjern tomme / dubletter. Hvis samme nr findes flere gange, beholder sidste række.
-  let byNr={}; players.forEach(p=>{ if(p.nr) byNr[p.nr]=p; });
-  return Object.values(byNr).sort((a,b)=>a.nr-b.nr);
-}
-function importPlayersFromExcel(event){
-  const file = event.target.files[0];
-  const status = document.getElementById('excelImportStatus');
-  if(!file) return;
-  if(typeof XLSX === 'undefined'){
-    status.innerHTML = '<span class="warn">Excel-biblioteket kunne ikke indlæses. Åbn appen med internetforbindelse første gang, eller brug CSV.</span>';
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data,{type:'array'});
-      const sheetName = workbook.SheetNames.includes('Spillere') ? 'Spillere' : workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet,{defval:''});
-      const imported = rowsToPlayers(rows);
-      if(!imported.length){ status.innerHTML='<span class="warn">Ingen spillere fundet. Tjek at Excel-arket har overskrifter.</span>'; return; }
-      state.players = imported;
-      localStorage.setItem(LS,JSON.stringify(state));
-      renderAll();
-      status.innerHTML = '<span class="ok">Importeret '+imported.length+' spillere fra arket "'+sheetName+'". Husk at kampplanen bruger spillernumre, så nr. bør matche data.js.</span>';
-    }catch(err){
-      console.error(err);
-      status.innerHTML = '<span class="warn">Kunne ikke importere filen. Prøv med .xlsx eller .csv med kolonnerne Nr, Navn og Niveau.</span>';
-    }
-  };
-  reader.readAsArrayBuffer(file);
-}
-function downloadPlayerTemplate(){
-  const rows = state.players.map(p=>({Nr:p.nr, Navn:p.name, Niveau:p.level||''}));
-  if(typeof XLSX !== 'undefined'){
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Spillere');
-    XLSX.writeFile(wb, 'spillerliste-skabelon.xlsx');
-  } else {
-    const csv = 'Nr;Navn;Niveau\n' + rows.map(r=>[r.Nr,r.Navn,r.Niveau].map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');
-    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); a.download='spillerliste-skabelon.csv'; a.click();
-  }
-}
-function resetPlayersToDefault(){
-  if(confirm('Vil du nulstille spillerlisten til standardlisten fra data.js?')){
-    state.players = DATA.players;
-    localStorage.setItem(LS,JSON.stringify(state));
-    renderAll();
-    document.getElementById('excelImportStatus').innerHTML='<span class="ok">Spillerlisten er nulstillet.</span>';
-  }
-}
-
 function renderAll(updateResults=true){renderDashboard(); renderStanding(); if(updateResults) renderResults(); renderSchedule(); renderPlayer(); renderPlayers()}
 renderAll();
 </script>
